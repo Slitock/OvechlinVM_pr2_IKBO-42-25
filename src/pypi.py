@@ -11,9 +11,7 @@ VERSION_SIGNS = "<>=!~"
 
 def fetch_json(url: str) -> tuple[dict | None, str | None]:
     """Загружает JSON по адресу и возвращает (данные, ошибка)."""
-    request = urllib.request.Request(
-        url, headers={"User-Agent": USER_AGENT}
-    )
+    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     try:
         with urllib.request.urlopen(request, timeout=TIMEOUT) as response:
             body = response.read().decode("utf-8")
@@ -72,9 +70,7 @@ def split_requirement(text: str) -> tuple[str, str, str]:
     return rest, "", marker
 
 
-def print_dependencies(
-    name: str, version: str, requires: list[str]
-) -> None:
+def print_dependencies(name: str, version: str, requires: list[str]) -> None:
     """Печатает все прямые зависимости пакета."""
     print()
     print(f"{name} {version}: direct dependencies ({len(requires)})")
