@@ -7,6 +7,8 @@
 import os
 import sys
 
+from src.pypi import fetch_release, print_dependencies
+
 LETTERS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 DIGITS = "0123456789"
 ALNUM = LETTERS + DIGITS
@@ -17,6 +19,9 @@ MODES = ("real", "test")
 REQUIRED = ("package", "repository", "version")
 MAX_NAME_LENGTH = 128
 WIDTH = len("repository") + 1
+EXIT_OK = 0
+EXIT_REPOSITORY = 1
+EXIT_USAGE = 2
 
 FLAGS = {
     "-p": "package",
@@ -167,6 +172,19 @@ def print_options(options: dict[str, str]) -> None:
         print(f"{label:<{WIDTH}} {value}")
 
 
+def show_dependencies(options: dict[str, str]) -> str | None:
+    """Загружает и печатает прямые зависимости пакета."""
+    data, error = fetch_release(
+        options["repository"],
+        options["package"],
+        options["version"],
+    )
+    if error:
+        return error
+    print_dependencies(data["name"], data["version"], data["requires"])
+    return None
+
+
 def main(argv: list[str] | None = None) -> int:
     """Запускает программу и возвращает код возврата."""
     if argv is None:
@@ -176,9 +194,13 @@ def main(argv: list[str] | None = None) -> int:
         error = check_all(options)
     if error:
         print(f"error: {error}", file=sys.stderr)
-        return 2
+        return EXIT_USAGE
     print_options(options)
-    return 0
+    error = show_dependencies(options)
+    if error:
+        print(f"error: {error}", file=sys.stderr)
+        return EXIT_REPOSITORY
+    return EXIT_OK
 
 
 if __name__ == "__main__":

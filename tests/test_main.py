@@ -5,6 +5,7 @@ import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
+from unittest.mock import patch
 
 from src.main import (
     check_filter,
@@ -16,6 +17,21 @@ from src.main import (
 )
 
 URL = "https://pypi.org/pypi"
+BODY = b'{"info": {"name": "requests", "version": "2.31.0"}}'
+
+
+class FakeResponse:
+    """Ответ PyPI без зависимостей."""
+
+    def read(self) -> bytes:
+        """Возвращает заранее заданное тело."""
+        return BODY
+
+    def __enter__(self) -> "FakeResponse":
+        return self
+
+    def __exit__(self, *args: object) -> bool:
+        return False
 
 
 class ReadOptionsTest(unittest.TestCase):
@@ -141,15 +157,19 @@ class MainTest(unittest.TestCase):
         return code, out.getvalue(), err.getvalue()
 
     def test_options_are_printed(self) -> None:
-        code, output, _ = self.run_main(
-            ["-p", "requests", "-r", URL, "-V", "2.31.0"]
-        )
+        with patch(
+            "src.pypi.urllib.request.urlopen",
+            return_value=FakeResponse(),
+        ):
+            code, output, _ = self.run_main(
+                ["-p", "requests", "-r", URL, "-V", "2.31.0"]
+            )
         self.assertEqual(code, 0)
         lines = output.strip().splitlines()
         self.assertTrue(lines[0].startswith("package:"))
         self.assertTrue(lines[0].endswith("requests"))
-        self.assertTrue(lines[-1].startswith("filter:"))
-        self.assertTrue(lines[-1].endswith("(none)"))
+        filters = [line for line in lines if line.startswith("filter:")]
+        self.assertTrue(filters[0].endswith("(none)"))
 
     def test_bad_option_gives_code_two(self) -> None:
         code, _, error = self.run_main(
