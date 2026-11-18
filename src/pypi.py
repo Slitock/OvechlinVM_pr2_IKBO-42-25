@@ -31,6 +31,22 @@ def release_url(base: str, package: str, version: str) -> str:
     return f"{base.rstrip('/')}/{package}/{version}/json"
 
 
+def index_url(base: str, package: str) -> str:
+    """Собирает адрес последнего релиза пакета."""
+    return f"{base.rstrip('/')}/{package}/json"
+
+
+def release_from_info(
+    info: dict, package: str, version: str
+) -> dict:
+    """Собирает описание релиза из поля info."""
+    return {
+        "name": info.get("name", package),
+        "version": info.get("version", version),
+        "requires": info.get("requires_dist") or [],
+    }
+
+
 def fetch_release(
     base: str, package: str, version: str
 ) -> tuple[dict | None, str | None]:
@@ -41,12 +57,18 @@ def fetch_release(
     info = data.get("info")
     if not info:
         return None, "repository response has no package information"
-    requires = info.get("requires_dist") or []
-    return {
-        "name": info.get("name", package),
-        "version": info.get("version", version),
-        "requires": requires,
-    }, None
+    return release_from_info(info, package, version), None
+
+
+def fetch_latest(base: str, package: str) -> tuple[dict | None, str | None]:
+    """Возвращает описание последнего релиза пакета."""
+    data, error = fetch_json(index_url(base, package))
+    if error:
+        return None, error
+    info = data.get("info")
+    if not info:
+        return None, "repository response has no package information"
+    return release_from_info(info, package, ""), None
 
 
 def split_requirement(text: str) -> tuple[str, str, str]:

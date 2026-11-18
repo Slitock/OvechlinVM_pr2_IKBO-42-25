@@ -1,19 +1,25 @@
 """Построение графа зависимостей пакета Python.
 
-Первый этап: читаем параметры командной строки, проверяем каждый
-и печатаем их в формате «ключ-значение».
+Программа читает параметры командной строки, получает зависимости
+из PyPI или из файла тестового репозитория и печатает граф.
 """
 
 import os
 import sys
 
-from src.pypi import fetch_release, print_dependencies
+from src.graph import build_graph
+from src.pypi import print_dependencies
+from src.repository import (
+    FileRepository,
+    RealRepository,
+    Repository,
+    load_test_repository,
+)
 
 LETTERS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 DIGITS = "0123456789"
 ALNUM = LETTERS + DIGITS
 NAME_CHARS = ALNUM + "._-"
-SEPARATORS = "._-"
 FILTER_FORBIDDEN = " \t\n,"
 MODES = ("real", "test")
 REQUIRED = ("package", "repository", "version")
@@ -172,12 +178,53 @@ def print_options(options: dict[str, str]) -> None:
         print(f"{label:<{WIDTH}} {value}")
 
 
-def show_dependencies(options: dict[str, str]) -> str | None:
-    """Загружает и печатает прямые зависимости пакета."""
-    data, error = fetch_release(
-        options["repository"],
+def make_repository(
+    options: dict[str, str],
+) -> tuple[Repository | None, str | None]:
+    """Создаёт источник данных по выбранному режиму."""
+    if options["mode"] == "test":
+        packages, error = load_test_repository(options["repository"])
+        if error:
+            return None, error
+        return FileRepository(packages), None
+    return RealRepository(options["repository"]), None
+
+
+def show_graph(
+    repository: Repository, options: dict[str, str]
+) -> str | None:
+    """Строит и печатает граф зависимостей."""
+    graph, error = build_graph(
+        repository,
         options["package"],
         options["version"],
+        options["filter"],
+    )
+    if error:
+        return error
+    print_graph(graph)
+    return None
+
+
+def print_graph(graph: dict[str, list[str]]) -> None:
+    """Печатает граф списком связей."""
+    edges = 0
+    for dependencies in graph.values():
+        edges += len(dependencies)
+    print()
+    print(f"graph: {len(graph)} packages, {edges} edges")
+    for name in graph:
+        print(f"  {name}")
+        for dependency in graph[name]:
+            print(f"    -> {dependency}")
+
+
+def show_dependencies(
+    repository: Repository, options: dict[str, str]
+) -> str | None:
+    """Загружает и печатает прямые зависимости пакета."""
+    data, error = repository.release(
+        options["package"], options["version"]
     )
     if error:
         return error
@@ -196,7 +243,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: {error}", file=sys.stderr)
         return EXIT_USAGE
     print_options(options)
-    error = show_dependencies(options)
+    repository, error = make_repository(options)
+    if error is None:
+        error = show_dependencies(repository, options)
+    if error is None:
+        error = show_graph(repository, options)
     if error:
         print(f"error: {error}", file=sys.stderr)
         return EXIT_REPOSITORY

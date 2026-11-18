@@ -146,22 +146,24 @@ class CheckRepositoryTest(unittest.TestCase):
         self.assertIn("not found", check_repository("no.txt", "test"))
 
 
+def run_main(argv: list[str]) -> tuple[int, str, str]:
+    """Запускает main и перехватывает оба потока вывода."""
+    out = io.StringIO()
+    err = io.StringIO()
+    with redirect_stdout(out), redirect_stderr(err):
+        code = main(argv)
+    return code, out.getvalue(), err.getvalue()
+
+
 class MainTest(unittest.TestCase):
     """Проверяем вывод и коды возврата."""
-
-    def run_main(self, argv: list[str]) -> tuple[int, str, str]:
-        out = io.StringIO()
-        err = io.StringIO()
-        with redirect_stdout(out), redirect_stderr(err):
-            code = main(argv)
-        return code, out.getvalue(), err.getvalue()
 
     def test_options_are_printed(self) -> None:
         with patch(
             "src.pypi.urllib.request.urlopen",
             return_value=FakeResponse(),
         ):
-            code, output, _ = self.run_main(
+            code, output, _ = run_main(
                 ["-p", "requests", "-r", URL, "-V", "2.31.0"]
             )
         self.assertEqual(code, 0)
@@ -172,15 +174,57 @@ class MainTest(unittest.TestCase):
         self.assertTrue(filters[0].endswith("(none)"))
 
     def test_bad_option_gives_code_two(self) -> None:
-        code, _, error = self.run_main(
+        code, _, error = run_main(
             ["-p", "bad name", "-r", URL, "-V", "1.0"]
         )
         self.assertEqual(code, 2)
         self.assertIn("error:", error)
 
     def test_test_mode_without_file_gives_code_two(self) -> None:
-        code, _, error = self.run_main(
+        code, _, error = run_main(
             ["-p", "A", "-r", "no.txt", "-m", "test", "-V", "1.0"]
         )
         self.assertEqual(code, 2)
         self.assertIn("not found", error)
+
+
+class TestModeTest(unittest.TestCase):
+    """Проверяем граф из файла тестового репозитория."""
+
+    def run_file(
+        self, text: str, extra: list[str]
+    ) -> tuple[int, str, str]:
+        """Запускает программу на временном файле."""
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory, "graph.txt")
+            path.write_text(text, encoding="utf-8")
+            argv = ["-p", "A", "-r", str(path), "-m", "test"]
+            return run_main(argv + ["-V", "1.0"] + extra)
+
+    def test_graph_is_built_from_file(self) -> None:
+        code, output, _ = self.run_file("A: B C\nB: D\nC: D\nD:\n", [])
+        self.assertEqual(code, 0)
+        self.assertIn("graph: 4 packages, 4 edges", output)
+        self.assertIn("    -> B", output)
+
+    def test_cycle_is_handled(self) -> None:
+        code, output, _ = self.run_file("A: B\nB: C\nC: A\n", [])
+        self.assertEqual(code, 0)
+        self.assertIn("graph: 3 packages, 3 edges", output)
+
+    def test_filter_is_applied(self) -> None:
+        code, output, _ = self.run_file(
+            "A: B C\nB:\nC: D\nD:\n", ["-f", "B"]
+        )
+        self.assertEqual(code, 0)
+        self.assertIn("graph: 3 packages, 2 edges", output)
+
+    def test_missing_package_gives_code_one(self) -> None:
+        code, _, error = self.run_file("A: B\n", [])
+        self.assertEqual(code, 1)
+        self.assertIn("missing", error)
+
+    def test_broken_line_gives_code_one(self) -> None:
+        code, _, error = self.run_file("A B\n", [])
+        self.assertEqual(code, 1)
+        self.assertIn("line 1", error)
