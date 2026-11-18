@@ -99,6 +99,22 @@ $ ./run.sh -p requests -r graph.txt -m test -V 2.31.0
 error: test repository file not found: 'graph.txt'
 ```
 
+```bash
+$ ./run.sh -p requests -r https://pypi.org/pypi -V 2.31.0 -m broken
+error: invalid mode: 'broken'
+```
+
+```bash
+$ ./run.sh -p requests -r https://pypi.org/pypi -V 2.31.0 -o picture
+error: invalid output mode: 'picture'
+```
+
+```bash
+$ ./run.sh -p requests -r "https://pypi.org/pypi extra" -V 2.31.0
+error: repository URL must not contain whitespace: \
+'https://pypi.org/pypi extra'
+```
+
 ## Пример использования
 
 Примеры этапов показывают только тот вывод, который относится к
@@ -204,8 +220,9 @@ Flask 2.3.3: direct dependencies (8)
   запрашивается последний релиз;
 * зависимости с маркерами (`extra == ...`, `python_version < ...`)
   в граф не включаются;
-* имена пакетов сравниваются без учёта регистра, поэтому `MarkupSafe`
-  и `markupsafe` — один узел;
+* имена пакетов сравниваются по правилам PEP 503 (нормализация
+  имён): регистр, точки, подчёркивания и дефисы не различаются,
+  поэтому `typing_extensions` и `typing-extensions` — один узел;
 * циклы не зацикливают обход: пакет попадает в граф до раскрытия и
   повторно в следующий уровень не добавляется.
 
@@ -328,6 +345,27 @@ $ ./run.sh -p A -r examples/cycle.txt -m test -V 1.0 -o order
 loading order (3)
   1. C
   2. B
+  3. A
+```
+
+Ромб и фильтр:
+
+```bash
+$ ./run.sh -p A -r examples/diamond.txt -m test -V 1.0 -o order
+...
+loading order (4)
+  1. D
+  2. B
+  3. C
+  4. A
+```
+
+```bash
+$ ./run.sh -p A -r examples/diamond.txt -m test -V 1.0 -f D -o order
+...
+loading order (3)
+  1. B
+  2. C
   3. A
 ```
 
