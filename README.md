@@ -100,6 +100,16 @@ error: test repository file not found: 'graph.txt'
 ```
 
 ```bash
+$ ./run.sh --colour red
+error: unknown option: --colour
+```
+
+```bash
+$ ./run.sh -p
+error: missing value for -p
+```
+
+```bash
 $ ./run.sh -p requests -r https://pypi.org/pypi -V 2.31.0 -m broken
 error: invalid mode: 'broken'
 ```
@@ -230,7 +240,8 @@ Flask 2.3.3: direct dependencies (8)
 
 Параметр `-f` задаёт подстроку: пакеты, в имени которых она есть,
 исключаются из анализа вместе со своими зависимостями. Регистр не
-учитывается.
+учитывается. Корневой пакет фильтр не отсекает: иначе анализировать
+было бы нечего.
 
 ### Тестовый репозиторий
 
