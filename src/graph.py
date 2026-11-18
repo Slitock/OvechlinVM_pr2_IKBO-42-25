@@ -6,8 +6,12 @@
 рекурсии раскрывает ровно один уровень.
 """
 
+import re
+
 from src.pypi import split_requirement
 from src.repository import Repository
+
+NAME_SEPARATOR = re.compile(r"[-_.]+")
 
 
 def build_graph(
@@ -74,10 +78,16 @@ def read_dependencies(
     return names, None
 
 
+def normalize_name(name: str) -> str:
+    """Приводит имя пакета к нормализованному виду PEP 503."""
+    return NAME_SEPARATOR.sub("-", name.lower())
+
+
 def find_node(graph: dict[str, list[str]], name: str) -> str | None:
-    """Ищет пакет в графе без учёта регистра имени."""
+    """Ищет пакет в графе по нормализованному имени."""
+    target = normalize_name(name)
     for existing in graph:
-        if existing.lower() == name.lower():
+        if normalize_name(existing) == target:
             return existing
     return None
 

@@ -100,6 +100,12 @@ class BuildGraphTest(unittest.TestCase):
         graph = {"markupsafe": []}
         self.assertEqual(find_node(graph, "MarkupSafe"), "markupsafe")
 
+    def test_separators_are_normalized(self) -> None:
+        graph = {"typing-extensions": []}
+        self.assertEqual(
+            find_node(graph, "typing_extensions"), "typing-extensions"
+        )
+
     def test_edges_count_is_correct(self) -> None:
         graph, error = build()
         edges = 0
