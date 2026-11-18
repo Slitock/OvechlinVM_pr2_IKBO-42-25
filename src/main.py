@@ -8,7 +8,7 @@ import os
 import sys
 import urllib.parse
 
-from src.dot import IMAGE_PATH, build_dot, render_image
+from src.dot import IMAGE_PATH, build_dot, open_image, render_image
 from src.graph import build_graph
 from src.order import load_order
 from src.pypi import print_dependencies
@@ -251,6 +251,7 @@ def show_dot(graph: dict[str, list[str]]) -> str | None:
         return error
     print()
     print(f"image: {IMAGE_PATH}")
+    open_image(IMAGE_PATH)
     return None
 
 

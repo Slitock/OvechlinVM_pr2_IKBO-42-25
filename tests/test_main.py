@@ -276,7 +276,10 @@ class TestModeTest(unittest.TestCase):
 
     def test_dot_is_printed(self) -> None:
         with patch("src.main.render_image", return_value=None):
-            code, output, _ = self.run_file("A: B\nB:\n", ["-o", "dot"])
+            with patch("src.main.open_image"):
+                code, output, _ = self.run_file(
+                    "A: B\nB:\n", ["-o", "dot"]
+                )
         self.assertEqual(code, 0)
         self.assertIn('"A" -> "B";', output)
         self.assertIn("image:", output)

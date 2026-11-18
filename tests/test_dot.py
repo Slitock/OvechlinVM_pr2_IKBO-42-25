@@ -1,11 +1,12 @@
 """Тесты пятого этапа: DOT и отрисовка картинки."""
 
+import os
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from src.dot import build_dot, quote_name, render_image
+from src.dot import build_dot, open_image, quote_name, render_image
 
 GRAPH = {"A": ["B"], "B": []}
 
@@ -60,3 +61,26 @@ class RenderImageTest(unittest.TestCase):
         with patch("src.dot.subprocess.run", side_effect=OSError(2, "no")):
             error = render_image("digraph {}")
         self.assertIn("cannot run", error)
+
+
+class OpenImageTest(unittest.TestCase):
+    """Проверяем открытие картинки просмотрщиком."""
+
+    def test_no_display_does_nothing(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            with patch("src.dot.subprocess.Popen") as popen:
+                open_image("out/graph.png")
+        popen.assert_not_called()
+
+    def test_display_starts_viewer(self) -> None:
+        with patch.dict(os.environ, {"DISPLAY": ":0"}, clear=True):
+            with patch("src.dot.subprocess.Popen") as popen:
+                open_image("out/graph.png")
+        command = popen.call_args.args[0]
+        self.assertEqual(command[0], "xdg-open")
+
+    def test_missing_viewer_is_ignored(self) -> None:
+        environment = {"WAYLAND_DISPLAY": "wayland-0"}
+        with patch.dict(os.environ, environment, clear=True):
+            with patch("src.dot.subprocess.Popen", side_effect=OSError):
+                open_image("out/graph.png")

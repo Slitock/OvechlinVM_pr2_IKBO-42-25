@@ -7,6 +7,8 @@ IMAGE_PATH = "out/graph.png"
 DOT_PROGRAM = "dot"
 IMAGE_FORMAT = "png"
 SUCCESS = 0
+OPEN_PROGRAM = "xdg-open"
+DISPLAY_VARIABLES = ("DISPLAY", "WAYLAND_DISPLAY")
 
 
 def quote_name(name: str) -> str:
@@ -43,3 +45,25 @@ def render_image(source: str, path: str = IMAGE_PATH) -> str | None:
     if result.returncode != SUCCESS:
         return f"{DOT_PROGRAM} failed: {result.stderr.strip()}"
     return None
+
+
+def has_display() -> bool:
+    """Проверяет, задана ли графическая среда."""
+    for name in DISPLAY_VARIABLES:
+        if os.environ.get(name):
+            return True
+    return False
+
+
+def open_image(path: str) -> None:
+    """Открывает картинку просмотрщиком, если есть графическая среда."""
+    if not has_display():
+        return
+    try:
+        subprocess.Popen(
+            [OPEN_PROGRAM, path],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except OSError:
+        return
