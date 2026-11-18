@@ -354,7 +354,8 @@ Installing collected packages: urllib3, idna, charset-normalizer, certifi, reque
 Второй пример:
 
 ```bash
-$ /tmp/venv/bin/pip install flask==2.3.3
+$ python3 -m venv /tmp/venv-flask
+$ /tmp/venv-flask/bin/pip install flask==2.3.3
 Installing collected packages: MarkupSafe, itsdangerous, click, blinker, Werkzeug, Jinja2, flask
 ```
 
