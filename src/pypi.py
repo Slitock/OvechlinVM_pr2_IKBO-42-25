@@ -3,6 +3,7 @@
 import json
 import urllib.error
 import urllib.request
+from http.client import InvalidURL
 
 TIMEOUT = 20
 USER_AGENT = "depviz/0.1"
@@ -11,19 +12,45 @@ VERSION_SIGNS = "<>=!~"
 
 def fetch_json(url: str) -> tuple[dict | None, str | None]:
     """Загружает JSON по адресу и возвращает (данные, ошибка)."""
-    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    request = make_request(url)
+    if request is None:
+        return None, f"invalid repository URL: {url}"
+    body, error = read_response(request, url)
+    if error:
+        return None, error
+    try:
+        text = body.decode("utf-8")
+    except UnicodeDecodeError:
+        return None, f"repository returned non-UTF-8 data: {url}"
+    try:
+        return json.loads(text), None
+    except json.JSONDecodeError:
+        return None, f"repository returned broken JSON: {url}"
+
+
+def make_request(url: str) -> urllib.request.Request | None:
+    """Создаёт запрос и возвращает None для неверного адреса."""
+    try:
+        return urllib.request.Request(
+            url, headers={"User-Agent": USER_AGENT}
+        )
+    except ValueError:
+        return None
+
+
+def read_response(
+    request: urllib.request.Request, url: str
+) -> tuple[bytes | None, str | None]:
+    """Читает тело ответа и превращает сетевые ошибки в текст."""
     try:
         with urllib.request.urlopen(request, timeout=TIMEOUT) as response:
-            body = response.read().decode("utf-8")
+            return response.read(), None
     except urllib.error.HTTPError as error:
         return None, f"repository answered {error.code}: {url}"
     except urllib.error.URLError as error:
         return None, f"cannot reach repository: {error.reason}"
-    try:
-        data = json.loads(body)
-    except json.JSONDecodeError:
-        return None, f"repository returned broken JSON: {url}"
-    return data, None
+    except (InvalidURL, ValueError):
+        return None, f"invalid repository URL: {url}"
 
 
 def release_url(base: str, package: str, version: str) -> str:

@@ -77,6 +77,11 @@ class FetchReleaseTest(unittest.TestCase):
         self.assertEqual(data["name"], "requests")
         self.assertEqual(data["requires"], ["idna (<4,>=2.5)"])
 
+    def test_invalid_url_is_reported(self) -> None:
+        data, error = fetch_release("https://[bad", "requests", "1.0")
+        self.assertIsNone(data)
+        self.assertIn("invalid", error)
+
     def test_missing_requires_gives_empty_list(self) -> None:
         body = json.dumps({"info": {"name": "click"}}).encode("utf-8")
         with open_with(body):
