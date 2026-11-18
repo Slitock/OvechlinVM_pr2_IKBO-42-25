@@ -148,6 +148,18 @@ class CheckRepositoryTest(unittest.TestCase):
     def test_url_without_host_is_rejected(self) -> None:
         self.assertIn("no host", check_repository("https://", "real"))
 
+    def test_url_with_space_is_rejected(self) -> None:
+        error = check_repository("https://pypi.org/pypi extra", "real")
+        self.assertIn("whitespace", error)
+
+    def test_broken_ipv6_url_is_rejected(self) -> None:
+        error = check_repository("https://[bad", "real")
+        self.assertIn("invalid", error)
+
+    def test_bad_port_is_rejected(self) -> None:
+        error = check_repository("https://pypi.org:99999/x", "real")
+        self.assertIn("invalid", error)
+
     def test_existing_file_passes_in_test_mode(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory, "graph.txt")

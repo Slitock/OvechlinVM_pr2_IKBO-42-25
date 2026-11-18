@@ -6,6 +6,7 @@
 
 import os
 import sys
+import urllib.parse
 
 from src.dot import IMAGE_PATH, build_dot, render_image
 from src.graph import build_graph
@@ -23,6 +24,7 @@ DIGITS = "0123456789"
 ALNUM = LETTERS + DIGITS
 NAME_CHARS = ALNUM + "._-"
 FILTER_FORBIDDEN = " \t\n,"
+URL_FORBIDDEN = " \t\n\r"
 MODES = ("real", "test")
 OUTPUT_MODES = ("graph", "order", "dot", "all")
 REQUIRED = ("package", "repository", "version")
@@ -138,14 +140,21 @@ def check_output(mode: str) -> str | None:
 
 
 def check_url(location: str) -> str | None:
-    """Проверяет, что адрес репозитория начинается с http или https."""
-    if location.startswith("http://"):
-        host = location[len("http://"):]
-    elif location.startswith("https://"):
-        host = location[len("https://"):]
-    else:
+    """Проверяет адрес репозитория."""
+    for char in URL_FORBIDDEN:
+        if char in location:
+            return (
+                "repository URL must not contain whitespace: "
+                f"{location!r}"
+            )
+    try:
+        parts = urllib.parse.urlsplit(location)
+        parts.port
+    except ValueError:
+        return f"invalid repository URL: {location!r}"
+    if parts.scheme not in ("http", "https"):
         return f"repository URL must use http or https: {location!r}"
-    if host == "" or host.startswith("/"):
+    if parts.hostname is None:
         return f"repository URL has no host: {location!r}"
     return None
 
