@@ -19,6 +19,7 @@ Python.
 src/main.py        интерфейс командной строки и проверки
 src/pypi.py        запрос к PyPI и разбор зависимостей
 src/graph.py       обход графа зависимостей
+src/order.py       порядок загрузки зависимостей
 src/repository.py  источники данных: PyPI и тестовый файл
 examples/          файлы тестового репозитория
 tests/             модульные тесты
@@ -47,6 +48,7 @@ test.sh            запуск тестов
 | `-m` | `--mode` | режим работы: `real` или `test` |
 | `-V` | `--version` | версия анализируемого пакета (обязательный) |
 | `-f` | `--filter` | подстрока, исключающая пакеты из анализа |
+| `-o` | `--output` | режим вывода: `graph`, `order` или `all` (по умолчанию `graph`) |
 
 Параметры читаются вручную из `sys.argv`: программа идёт по списку
 аргументов парами «флаг — значение». Для каждого флага есть короткая
@@ -287,6 +289,80 @@ error: invalid test repository line 1: 'A B'
 ```bash
 error: package is missing in test repository: 'Z'
 ```
+
+## Этап 4. Порядок загрузки
+
+Режим `-o order` печатает порядок, в котором пакеты нужно загружать:
+сначала зависимости, затем пакет, который от них зависит. Порядок
+строится обходом в глубину: пакет добавляется в результат после всех
+своих зависимостей, поэтому любое ребро графа идёт от более раннего
+пакета к более позднему.
+
+```bash
+$ ./run.sh -p requests -r https://pypi.org/pypi -V 2.31.0 -o order
+...
+loading order (5)
+  1. charset-normalizer
+  2. idna
+  3. urllib3
+  4. certifi
+  5. requests
+```
+
+Если в графе есть цикл, строгого порядка не существует. Обход всё
+равно завершается: посещённый пакет повторно не раскрывается, а ребро
+цикла остаётся в графе.
+
+```bash
+$ ./run.sh -p A -r examples/cycle.txt -m test -V 1.0 -o order
+...
+loading order (3)
+  1. C
+  2. B
+  3. A
+```
+
+Режим `-o all` печатает и граф, и порядок загрузки.
+
+### Сравнение с pip
+
+Порядок установки pip выводит в строке `Installing collected packages`.
+Проверка выполнена в чистом виртуальном окружении:
+
+```bash
+$ python3 -m venv /tmp/venv
+$ /tmp/venv/bin/pip install requests==2.31.0
+Installing collected packages: urllib3, idna, charset-normalizer, certifi, requests
+```
+
+```
+наш порядок:  charset-normalizer, idna, urllib3, certifi, requests
+порядок pip:  urllib3, idna, charset-normalizer, certifi, requests
+```
+
+Наборы пакетов совпадают. Порядок различается только у независимых
+пакетов: между ними нет рёбер, поэтому оба порядка корректны.
+Второй пример:
+
+```bash
+$ /tmp/venv/bin/pip install flask==2.3.3
+Installing collected packages: MarkupSafe, itsdangerous, click, blinker, Werkzeug, Jinja2, flask
+```
+
+```
+наш порядок:  markupsafe, Werkzeug, Jinja2, itsdangerous, click, blinker, flask
+порядок pip:  MarkupSafe, itsdangerous, click, blinker, Werkzeug, Jinja2, flask
+```
+
+Здесь тоже совпадают и набор пакетов, и свойство «зависимость раньше
+зависимого». Отличия:
+
+* у независимых пакетов порядок не определён однозначно, pip
+  сортирует их по своим весам;
+* регистр имени: pip печатает имя проекта (`MarkupSafe`), программа —
+  имя из `requires_dist` (`markupsafe`), для pip это один пакет;
+* версии: pip разрешает ограничения из `requires_dist`, программа
+  берёт последний релиз каждой транзитивной зависимости.
 
 ## Ограничения
 

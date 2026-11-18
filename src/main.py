@@ -8,6 +8,7 @@ import os
 import sys
 
 from src.graph import build_graph
+from src.order import load_order
 from src.pypi import print_dependencies
 from src.repository import (
     FileRepository,
@@ -22,6 +23,7 @@ ALNUM = LETTERS + DIGITS
 NAME_CHARS = ALNUM + "._-"
 FILTER_FORBIDDEN = " \t\n,"
 MODES = ("real", "test")
+OUTPUT_MODES = ("graph", "order", "all")
 REQUIRED = ("package", "repository", "version")
 MAX_NAME_LENGTH = 128
 WIDTH = len("repository") + 1
@@ -40,6 +42,8 @@ FLAGS = {
     "--version": "version",
     "-f": "filter",
     "--filter": "filter",
+    "-o": "output",
+    "--output": "output",
 }
 
 DEFAULTS = {
@@ -48,6 +52,7 @@ DEFAULTS = {
     "mode": "real",
     "version": "",
     "filter": "",
+    "output": "graph",
 }
 
 
@@ -124,6 +129,13 @@ def check_filter(text: str) -> str | None:
     return None
 
 
+def check_output(mode: str) -> str | None:
+    """Проверяет режим вывода."""
+    if mode not in OUTPUT_MODES:
+        return f"invalid output mode: {mode!r}"
+    return None
+
+
 def check_url(location: str) -> str | None:
     """Проверяет, что адрес репозитория начинается с http или https."""
     if location.startswith("http://"):
@@ -165,6 +177,9 @@ def check_all(options: dict[str, str]) -> str | None:
     error = check_filter(options["filter"])
     if error:
         return error
+    error = check_output(options["output"])
+    if error:
+        return error
     return check_repository(options["repository"], options["mode"])
 
 
@@ -190,20 +205,35 @@ def make_repository(
     return RealRepository(options["repository"]), None
 
 
-def show_graph(
+def make_graph(
     repository: Repository, options: dict[str, str]
-) -> str | None:
-    """Строит и печатает граф зависимостей."""
-    graph, error = build_graph(
+) -> tuple[dict[str, list[str]] | None, str | None]:
+    """Строит граф зависимостей по параметрам."""
+    return build_graph(
         repository,
         options["package"],
         options["version"],
         options["filter"],
     )
-    if error:
-        return error
-    print_graph(graph)
-    return None
+
+
+def show_output(
+    options: dict[str, str], graph: dict[str, list[str]]
+) -> None:
+    """Печатает результат в выбранном режиме."""
+    mode = options["output"]
+    if mode in ("graph", "all"):
+        print_graph(graph)
+    if mode in ("order", "all"):
+        print_order(load_order(graph, options["package"]))
+
+
+def print_order(order: list[str]) -> None:
+    """Печатает порядок загрузки зависимостей."""
+    print()
+    print(f"loading order ({len(order)})")
+    for number, name in enumerate(order, start=1):
+        print(f"  {number}. {name}")
 
 
 def print_graph(graph: dict[str, list[str]]) -> None:
@@ -247,7 +277,9 @@ def main(argv: list[str] | None = None) -> int:
     if error is None:
         error = show_dependencies(repository, options)
     if error is None:
-        error = show_graph(repository, options)
+        graph, error = make_graph(repository, options)
+        if error is None:
+            show_output(options, graph)
     if error:
         print(f"error: {error}", file=sys.stderr)
         return EXIT_REPOSITORY

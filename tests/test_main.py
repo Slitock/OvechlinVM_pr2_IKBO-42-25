@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 from src.main import (
     check_filter,
+    check_output,
     check_package,
     check_repository,
     check_version,
@@ -124,6 +125,17 @@ class CheckFilterTest(unittest.TestCase):
         self.assertIn("whitespace", check_filter("a,b"))
 
 
+class CheckOutputTest(unittest.TestCase):
+    """Проверяем режим вывода."""
+
+    def test_known_modes_pass(self) -> None:
+        for mode in ("graph", "order", "all"):
+            self.assertIsNone(check_output(mode))
+
+    def test_unknown_mode_is_rejected(self) -> None:
+        self.assertIn("invalid", check_output("picture"))
+
+
 class CheckRepositoryTest(unittest.TestCase):
     """Проверяем, что режим задаёт смысл пути."""
 
@@ -228,3 +240,24 @@ class TestModeTest(unittest.TestCase):
         code, _, error = self.run_file("A B\n", [])
         self.assertEqual(code, 1)
         self.assertIn("line 1", error)
+
+    def test_order_is_printed(self) -> None:
+        code, output, _ = self.run_file(
+            "A: B\nB: C\nC:\n", ["-o", "order"]
+        )
+        self.assertEqual(code, 0)
+        self.assertIn("loading order (3)", output)
+        self.assertIn("1. C", output)
+        self.assertIn("3. A", output)
+        self.assertNotIn("graph:", output)
+
+    def test_all_prints_graph_and_order(self) -> None:
+        code, output, _ = self.run_file("A: B\nB:\n", ["-o", "all"])
+        self.assertEqual(code, 0)
+        self.assertIn("graph: 2 packages", output)
+        self.assertIn("loading order (2)", output)
+
+    def test_bad_output_mode_gives_code_two(self) -> None:
+        code, _, error = self.run_file("A:\n", ["-o", "picture"])
+        self.assertEqual(code, 2)
+        self.assertIn("invalid output mode", error)
