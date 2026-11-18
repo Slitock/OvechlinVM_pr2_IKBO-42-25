@@ -7,6 +7,7 @@
 import os
 import sys
 
+from src.dot import IMAGE_PATH, build_dot, render_image
 from src.graph import build_graph
 from src.order import load_order
 from src.pypi import print_dependencies
@@ -23,7 +24,7 @@ ALNUM = LETTERS + DIGITS
 NAME_CHARS = ALNUM + "._-"
 FILTER_FORBIDDEN = " \t\n,"
 MODES = ("real", "test")
-OUTPUT_MODES = ("graph", "order", "all")
+OUTPUT_MODES = ("graph", "order", "dot", "all")
 REQUIRED = ("package", "repository", "version")
 MAX_NAME_LENGTH = 128
 WIDTH = len("repository") + 1
@@ -219,13 +220,29 @@ def make_graph(
 
 def show_output(
     options: dict[str, str], graph: dict[str, list[str]]
-) -> None:
+) -> str | None:
     """Печатает результат в выбранном режиме."""
     mode = options["output"]
     if mode in ("graph", "all"):
         print_graph(graph)
     if mode in ("order", "all"):
         print_order(load_order(graph, options["package"]))
+    if mode in ("dot", "all"):
+        return show_dot(graph)
+    return None
+
+
+def show_dot(graph: dict[str, list[str]]) -> str | None:
+    """Печатает DOT и рисует картинку."""
+    source = build_dot(graph)
+    print()
+    print(source)
+    error = render_image(source)
+    if error:
+        return error
+    print()
+    print(f"image: {IMAGE_PATH}")
+    return None
 
 
 def print_order(order: list[str]) -> None:
@@ -279,7 +296,7 @@ def main(argv: list[str] | None = None) -> int:
     if error is None:
         graph, error = make_graph(repository, options)
         if error is None:
-            show_output(options, graph)
+            error = show_output(options, graph)
     if error:
         print(f"error: {error}", file=sys.stderr)
         return EXIT_REPOSITORY

@@ -129,7 +129,7 @@ class CheckOutputTest(unittest.TestCase):
     """Проверяем режим вывода."""
 
     def test_known_modes_pass(self) -> None:
-        for mode in ("graph", "order", "all"):
+        for mode in ("graph", "order", "dot", "all"):
             self.assertIsNone(check_output(mode))
 
     def test_unknown_mode_is_rejected(self) -> None:
@@ -261,3 +261,16 @@ class TestModeTest(unittest.TestCase):
         code, _, error = self.run_file("A:\n", ["-o", "picture"])
         self.assertEqual(code, 2)
         self.assertIn("invalid output mode", error)
+
+    def test_dot_is_printed(self) -> None:
+        with patch("src.main.render_image", return_value=None):
+            code, output, _ = self.run_file("A: B\nB:\n", ["-o", "dot"])
+        self.assertEqual(code, 0)
+        self.assertIn('"A" -> "B";', output)
+        self.assertIn("image:", output)
+
+    def test_render_error_gives_code_one(self) -> None:
+        with patch("src.main.render_image", return_value="dot failed"):
+            code, _, error = self.run_file("A: B\nB:\n", ["-o", "dot"])
+        self.assertEqual(code, 1)
+        self.assertIn("dot failed", error)
